@@ -11,6 +11,7 @@ X = X/(np.amax(X, axis=0))
 Y = Y/100.0
 
 class Neural_Network(object):
+
 	def __init__ (self):
 		#hyperparameters
 		self.inputLayerSize = 2
@@ -19,6 +20,12 @@ class Neural_Network(object):
 
 		self.W1 = np.random.randn(self.inputLayerSize,self.hiddenLayerSize)
 		self.W2 = np.random.randn(self.hiddenLayerSize,self.outerLayerSize)
+
+	def sigmoid(self,z):
+		return 1.0/(1.0+np.exp(-z))
+
+	def sigmoidPrime(self,z):
+		return self.sigmoid(z)*(1-self.sigmoid(z))
 
 	def forward (self, X):
 		#propagates input through networks
@@ -41,27 +48,94 @@ class Neural_Network(object):
 		delta3 = np.multiply(-(Y-self.yHat), self.sigmoidPrime(self.z3))
 		dJdW2 = np.dot(self.a2.T, delta3)
 
-		delta2 = np.dot(delta3, self.w2.T)*self.sigmoidPrime(self.z2)
+		delta2 = np.dot(delta3, self.W2.T)*self.sigmoidPrime(self.z2)
 		dJdW1 = np.dot(X.T, delta2)
 
 		return dJdW1, dJdW2
 
-	def sigmoid(self,z):
-		return 1.0/(1.0+np.exp(-z))
+	#numerical gradient checking
 
-	def sigmoidPrime(self,z):
-		return self.sigmoid(z)*(1-self.sigmoid(z))
+	#helper function to interact with other function
+	def getParams(self):
+		#rolling W1 and W2 rolled into a single vector
+		params = np.concatenate((self.W1.ravel(),self.W2.ravel()))
+		return params
+
+	def setParams(self, params):
+		#set W1 and W2 rolled into vectors
+		W1_start = 0
+		W1_end = self.inputLayerSize*self.hiddenLayerSize
+		self.W1 = np.reshape(params[W1_start:W1_end], (self.inputLayerSize, self.hiddenLayerSize))
+		W2_end = W1_end + self.hiddenLayerSize*self.outerLayerSize
+		self.W2 = np.reshape(params[W1_end:W2_end], (self.hiddenLayerSize, self.outerLayerSize))
+
+	def computeGradients(self, X,Y):
+		#returns a single vector containg gradients with respect to different weights
+		dJdW1, dJdW2 = self.costFunctionPrime(X, Y)
+		return np.concatenate((dJdW1.ravel(),dJdW2.ravel()))
+	
+	def computeNumericalGradients(self, X, Y):
+		paramsIntial = self.getParams()
+		numgrad = np.zeros(paramsIntial.shape)
+		perturb = np.zeros(paramsIntial.shape)
+		e = 1e-4
+
+		#I will perturb each weight one by one and calculate the
+		#corresponding gradient
+		#by the end we will get a vector having numericaly 
+		#gradients calculated
+		for p in range(len(paramsIntial)):
+			perturb[p] = e
+			self.setParams(paramsIntial+perturb)
+			loss2 = self.costFunction(X,Y)
+
+			self.setParams(paramsIntial-perturb)
+			loss1 = self.costFunction(X,Y)
+
+			numgrad[p] = (loss2-loss1)/(2*e)
+			perturb[p] = 0
+
+		self.setParams(paramsIntial)
+		return numgrad
+
+	def gradCheck(self, X, Y):
+		grad = self.computeGradients(X,Y)
+		numgrad = self.computeNumericalGradients(X,Y)
+		return ((np.linalg.norm(grad-numgrad)/np.linalg.norm(grad+numgrad))<1e-8)
+
+
+
+
+
 
 NN = Neural_Network()
 y = NN.forward(X)
 
 cost1 = NN.costFunction(X,Y)
+dJdW1,dJdW2 = NN.costFunctionPrime(X,Y)
+
+#to demo the effect of moving along and opposite to the gradient
+#slr = 3.0
+#NN.W1 = NN.W1 + slr*dJdW1
+#NN.W2 = NN.W2 + slr*dJdW2
+#cost2 = NN.costFunction(X,Y)
+#NN.W1 = NN.W1 - 2*slr*dJdW1
+#NN.W2 = NN.W2 - 2*slr*dJdW2
+#cost3 = NN.costFunction(X,Y)
+
+gradient = NN.computeGradients(X,Y)
+numGradient = NN.computeNumericalGradients(X,Y)
+check = NN.gradCheck(X,Y)
+
+#to check whether gradients are calculated correctly
 
 print("X is:",X)
-print("W1 is:",NN.W1)
-print("W2 is:",NN.W2)
 print("prediction is:",y)
 print("cost1 is:",cost1)
-
-#print(cost2)
-#print(cost3)
+#print("cost2 is:",cost2)
+#print("cost3 is:",cost3)
+print("gradient is:", gradient)
+print("Numerical Gradient is:", numGradient)
+print("check passed:", check)
+print("W1 is:",NN.W1)
+print("W2 is:",NN.W2)
