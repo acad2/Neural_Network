@@ -1,5 +1,5 @@
 import numpy as np
-import scipy as optimize
+from scipy import optimize
 
 #input data
 X = np.array(([3,5],[5,1],[10,2]), dtype = float)
@@ -103,12 +103,47 @@ class Neural_Network(object):
 		numgrad = self.computeNumericalGradients(X,Y)
 		return ((np.linalg.norm(grad-numgrad)/np.linalg.norm(grad+numgrad))<1e-8)
 
+class trainer(object):
+	def __init__(self, N):
+		#local refernce to Neural_Network
+		self.N = N
+
+	#wrapper functions which returns the output which satisfies
+	#the semantics of the minimize function
+	def wrapper(self, params, X, Y):
+		self.N.setParams(params)
+		cost = self.N.costFunction(X, Y)
+		grad = self.N.computeGradients(X,Y)
+		return cost, grad
+
+	def callbackF(self, params):
+		self.N.setParams(params)
+		self.J.append(self.N.costFunction(self.X, self.Y))
+
+	def train(self, X, Y):
+		self.X = X
+		self.Y = Y
+
+		self.J = []
+
+		paramsI = self.N.getParams()
+
+		options = {'maxiter': 200, 'disp':True}
 
 
+		#minimize function from optimize requires a function
+		#as parameter which accepts 2 vectors output and input
+		#and returns the cost function and the gradients
+		_res = optimize.minimize(self.wrapper, paramsI, jac = True, method='BFGS',\
+		 						args = (X,Y), options = options, callback = self.callbackF)
 
+		self.N.setParams(_res.x)
+		self.optimizationResult = _res
 
 
 NN = Neural_Network()
+T = trainer(NN)
+T.train(X,Y)
 y = NN.forward(X)
 
 cost1 = NN.costFunction(X,Y)
